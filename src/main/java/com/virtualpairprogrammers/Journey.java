@@ -13,21 +13,23 @@ import org.springframework.jms.core.JmsTemplate;
  * A callable (so we can invoke in on a executor and join on it) that sends messages
  * to a queue periodically - represeting the journey of a delivery vehicle.
  */
-public class Journey implements Callable<Object> 
+public class Journey implements Callable<Object>
 {
 	private List<String> positions;
 	private String vehicleName;
 	private JmsTemplate jmsTemplate;
+	private String queueName;
 
-	public Journey(String vehicleName, List<String> positions, JmsTemplate jmsTemplate) 
+	public Journey(String vehicleName, List<String> positions, JmsTemplate jmsTemplate, String queueName)
 	{
 		this.positions = Collections.unmodifiableList(positions);
 		this.vehicleName = vehicleName;
 		this.jmsTemplate = jmsTemplate;
+		this.queueName = queueName;
 	}
 
 	@Override
-	public Object call() throws InterruptedException  
+	public Object call() throws InterruptedException
 	{
 		for (String nextReport: this.positions)
 		{
@@ -44,7 +46,7 @@ public class Journey implements Callable<Object>
 
 			sendToQueue(positionMessage);
 
-			// We have an element of randomness to help the queue be nicely 
+			// We have an element of randomness to help the queue be nicely
 			// distributed
 			delay(Math.random() * 200 + 200);
 		}
@@ -56,7 +58,7 @@ public class Journey implements Callable<Object>
 	 * Sends a message to the position queue - we've hardcoded this in at present - of course
 	 * this needs to be fixed on the course!
 	 * @param positionMessage
-	 * @throws InterruptedException 
+	 * @throws InterruptedException
 	 */
 	private void sendToQueue(Map<String, String> positionMessage) throws InterruptedException {
 		boolean messageNotSent = true;
@@ -65,7 +67,7 @@ public class Journey implements Callable<Object>
 			// broadcast this report
 			try
 			{
-				jmsTemplate.convertAndSend("positionQueue",positionMessage);
+				jmsTemplate.convertAndSend(this.queueName,positionMessage);
 				messageNotSent = false;
 			}
 			catch (UncategorizedJmsException e)

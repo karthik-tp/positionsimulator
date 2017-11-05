@@ -16,6 +16,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jms.core.JmsTemplate;
@@ -27,29 +28,32 @@ public class JourneySimulator implements Runnable {
 	@Autowired
 	private JmsTemplate template;
 
+	@Value("${fleetman.position.queue}")
+	private String queueName;
+
 	private ExecutorService threadPool;
 
-	public void run() 
+	public void run()
 	{
-		try 
+		try
 		{
 			this.runVehicleSimulation();
-		} 
-		catch (InterruptedException e) 
+		}
+		catch (InterruptedException e)
 		{
 			Thread.currentThread().interrupt();
 		}
 	}
 
 	/**
-	 * For each vehicle, a thread is started which simulates a journey for that vehicle. 
-	 * When all vehicles have completed, we start all over again. 
-	 * @throws InterruptedException 
+	 * For each vehicle, a thread is started which simulates a journey for that vehicle.
+	 * When all vehicles have completed, we start all over again.
+	 * @throws InterruptedException
 	 */
-	public void runVehicleSimulation() throws InterruptedException 
+	public void runVehicleSimulation() throws InterruptedException
 	{
 		Map<String, List<String>> reports = setUpData();
-		threadPool = Executors.newCachedThreadPool();		
+		threadPool = Executors.newCachedThreadPool();
 		boolean stillRunning = true;
 		while (stillRunning)
 		{
@@ -58,9 +62,9 @@ public class JourneySimulator implements Runnable {
 			for (String vehicleName : reports.keySet())
 			{
 				// kick off a message sending thread for this vehicle.
-				calls.add(new Journey(vehicleName, reports.get(vehicleName), template));
+				calls.add(new Journey(vehicleName, reports.get(vehicleName), template, queueName));
 			}
-			
+
 			threadPool.invokeAll(calls);
 			if (threadPool.isShutdown())
 			{
@@ -78,7 +82,7 @@ public class JourneySimulator implements Runnable {
 	 * Read the data from the resources directory - should work for an executable Jar as
 	 * well as through direct execution
 	 */
-	private Map<String, List<String>> setUpData() 
+	private Map<String, List<String>> setUpData()
 	{
 		Map<String, List<String>> reports = new HashMap<>();
 		PathMatchingResourcePatternResolver path = new PathMatchingResourcePatternResolver();
@@ -88,7 +92,7 @@ public class JourneySimulator implements Runnable {
 			for (Resource nextFile : path.getResources("tracks/*"))
 			{
 				URL resource = nextFile.getURL();
-				File f = new File(resource.getFile()); 
+				File f = new File(resource.getFile());
 				String vehicleName = f.getName();
 				InputStream is = PositionsimulatorApplication.class.getResourceAsStream("/tracks/" + f.getName());
 				try (Scanner sc = new Scanner(is))
@@ -110,7 +114,7 @@ public class JourneySimulator implements Runnable {
 		}
 	}
 
-	public void finish() 
+	public void finish()
 	{
 		threadPool.shutdownNow();
 	}
